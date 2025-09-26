@@ -1,4 +1,5 @@
-﻿using Follower.ServiceInterfaces;
+﻿using Follower.Dto;
+using Follower.ServiceInterfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
@@ -12,27 +13,25 @@ namespace Follower.Controllers
     {
         private string? UserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
         private string? Username => User.FindFirstValue(ClaimTypes.Email);
-        private readonly ILogger<FollowController> _logger;
         private readonly IFollowService _followService;
-        public FollowController(ILogger<FollowController> logger, IFollowService followService)
+        public FollowController( IFollowService followService)
         {
-            _logger = logger;
             _followService = followService;
         }
 
         [Authorize]
-        [HttpPost("{targetId}")]
-        public async Task<IActionResult> Follow(string targetId)
+        [HttpPost("follow")]
+        public async Task<IActionResult> Follow([FromBody] UserDto user)
         {
             if (string.IsNullOrEmpty(UserId) || string.IsNullOrEmpty(Username)) return Unauthorized();
-            if (string.Equals(UserId, targetId, StringComparison.Ordinal)) return BadRequest("Cannot follow self.");
-            var success = await _followService.FollowAsync(UserId, targetId);
+            if (string.Equals(UserId, user.Id, StringComparison.Ordinal)) return BadRequest("Cannot follow self.");
+            var success = await _followService.FollowAsync(new UserDto(UserId,Username), user);
 
-            return success ? Ok(new { followed = targetId }) : StatusCode(500, "Unable to follow.");
+            return success ? Ok(new { followed = user.Id }) : StatusCode(500, "Unable to follow.");
         }
 
         [Authorize]
-        [HttpDelete("{targetId}")]
+        [HttpDelete("unfollow/{targetId}")]
         public async Task<IActionResult> Unfollow([FromRoute] string targetId)
         {
             var me = UserId;
@@ -72,17 +71,6 @@ namespace Follower.Controllers
 
             var list = await _followService.GetRecommedationsAsync(UserId);
             return Ok(list);
-        }
-
-        [Authorize]
-        [HttpPost("add-user")]
-        public async Task<IActionResult> InsertUser()
-        {
-            if (string.IsNullOrWhiteSpace(UserId) || string.IsNullOrWhiteSpace(Username))
-                return BadRequest("Id and Username are required.");
-
-            await _followService.InsertUserAsync(UserId, Username);
-            return Ok(new { createdOrUpdated = UserId });
         }
     }
 }
