@@ -1,0 +1,39 @@
+version: '3.8'
+services:
+  neo4j:
+    image: neo4j:latest
+    container_name: neo4j
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/followers
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - neo4j_import:/import
+      - neo4j_plugins:/plugins
+  follower-api:
+    build: 
+      context: .
+      dockerfile: Followers/Dockerfile
+    container_name: follower-api
+    depends_on:
+      - neo4j
+    ports:
+      - "5228:5228"
+    environment:
+      URI: ${URI}
+      USER: ${USER}
+      PASSWORD: ${PASSWORD}
+      SECRET_KEY: ${SECRET_KEY}
+      ISSUER: ${ISSUER}
+      AUDIENCE: ${AUDIENCE}
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: "http://+:5228"
+
+volumes:
+  neo4j_data:
+  neo4j_logs:
+  neo4j_import:
+  neo4j_plugins:

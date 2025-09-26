@@ -7,11 +7,13 @@ namespace Follower.Services
 {
     public sealed class FollowService(IDriver driver) : IFollowService
     {
-        public async Task<bool> FollowAsync(string followerId, string followeeId)
+        public async Task<bool> FollowAsync(UserDto follower, UserDto followee)
         {
             const string cypher = """
                 MERGE (a:User {id: $followerId})
+                ON CREATE SET a.username = $followerUsername
                 MERGE (b:User {id: $followeeId})
+                ON CREATE SET b.username = $followeeUsername
                 MERGE (a)-[r:FOLLOWS]->(b)
                 ON CREATE SET r.since = datetime()
                 RETURN r
@@ -19,7 +21,13 @@ namespace Follower.Services
             await using var session = driver.AsyncSession(o => o.WithDefaultAccessMode(AccessMode.Write));
             var created = await session.ExecuteWriteAsync(async tx =>
             {
-                var result = await tx.RunAsync(cypher, new { followerId, followeeId });
+                var result = await tx.RunAsync(cypher, new 
+                {
+                    followerId = follower.Id,
+                    followerUsername = follower.Username,
+                    followeeId = followee.Id,
+                    followeeUsername = followee.Username
+                });
                 var record = await result.SingleAsync();
                 return record != null;
             });
@@ -110,22 +118,6 @@ namespace Follower.Services
                         cur.Current["mutualCount"].As<long>()));
                 }
                 return list;
-            });
-        }
-
-        public async Task InsertUserAsync(string id, string username)
-        {
-            const string cypher = """
-                MERGE (u:User {id:$id})
-                ON CREATE SET u.username = $username
-                ON MATCH  SET u.username = coalesce($username, u.username)
-                RETURN u.id AS id
-                """;
-
-            await using var session = driver.AsyncSession(o => o.WithDefaultAccessMode(AccessMode.Write));
-            await session.ExecuteWriteAsync(async tx =>
-            {
-                await tx.RunAsync(cypher, new { id, username });
             });
         }
     }
