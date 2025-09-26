@@ -1,5 +1,7 @@
 using DotNetEnv;
 using Follower;
+using Follower.ServiceInterfaces;
+using Follower.Services;
 using Follower.Startup;
 using Neo4j.Driver;
 
@@ -16,6 +18,8 @@ if (builder.Environment.IsDevelopment())
 
 builder.Services.ConfigureNeo4j(builder.Configuration);
 builder.Services.ConfigureAuth(builder.Configuration);
+builder.Services.AddHostedService<Neo4jBootstrapper>();
+builder.Services.AddScoped<IFollowService, FollowService>();
 
 var app = builder.Build();
 
