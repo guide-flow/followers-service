@@ -42,34 +42,32 @@ namespace Follower.Controllers
         }
 
         [Authorize]
-        [HttpGet("following")]
-        public async Task<IActionResult> GetFollowing()
+        [HttpGet("following/{id}")]
+        public async Task<IActionResult> GetFollowing(string id)
         {
-            var me = UserId;
-            if (string.IsNullOrWhiteSpace(me)) return Unauthorized();
+            if (string.IsNullOrWhiteSpace(id)) return Unauthorized();
 
-            var list = await _followService.GetFollowingAsync(me);
+            var list = await _followService.GetFollowingAsync(id);
             return Ok(list);
         }
 
         [Authorize]
-        [HttpGet("followers")]
-        public async Task<IActionResult> GetFollowers()
+        [HttpGet("followers/{id}")]
+        public async Task<IActionResult> GetFollowers(string id)
         {
-            var me = UserId;
-            if (string.IsNullOrWhiteSpace(me)) return Unauthorized();
+            if (string.IsNullOrWhiteSpace(id)) return Unauthorized();
 
-            var list = await _followService.GetFollowersAsync(me);
+            var list = await _followService.GetFollowersAsync(id);
             return Ok(list);
         }
 
         [Authorize]
-        [HttpGet("recommendations")]
-        public async Task<IActionResult> GetRecommendations()
+        [HttpGet("recommendations/{id}")]
+        public async Task<IActionResult> GetRecommendations(string id)
         {
-            if (string.IsNullOrWhiteSpace(UserId)) return Unauthorized();
+            if (string.IsNullOrWhiteSpace(id)) return Unauthorized();
 
-            var list = await _followService.GetRecommedationsAsync(UserId);
+            var list = await _followService.GetRecommedationsAsync(id);
             return Ok(list);
         }
     }
