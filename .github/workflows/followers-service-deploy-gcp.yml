@@ -1,0 +1,78 @@
+name: Build and Deploy Followers Service to GCP
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  GCP_PROJECT_ID: soa-backend
+  GCP_REGION: europe-west3
+  GKE_CLUSTER: soa-cluster
+  ARTIFACT_REGISTRY: europe-west3-docker.pkg.dev
+  IMAGE_NAME: follower-api
+  GKE_NAMESPACE: soa-app
+  DEPLOYMENT_NAME: follower-api
+  BUILD_CONTEXT: Followers
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        working-directory: ${{ env.BUILD_CONTEXT }}
+        run: dotnet restore
+
+      - name: Build
+        working-directory: ${{ env.BUILD_CONTEXT }}
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Install GKE Auth Plugin
+        run: |
+          gcloud components install gke-gcloud-auth-plugin --quiet
+
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker ${{ env.ARTIFACT_REGISTRY }} --quiet
+
+      - name: Build and push Docker image
+        working-directory: ${{ env.BUILD_CONTEXT }}
+        run: |
+          docker build -f Followers/Dockerfile -t ${{ env.ARTIFACT_REGISTRY }}/${{ env.GCP_PROJECT_ID }}/soa-app-repo/${{ env.IMAGE_NAME }}:latest .
+          docker push ${{ env.ARTIFACT_REGISTRY }}/${{ env.GCP_PROJECT_ID }}/soa-app-repo/${{ env.IMAGE_NAME }}:latest
+
+      - name: Get GKE credentials
+        run: |
+          gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} \
+            --region=${{ env.GCP_REGION }} \
+            --project=${{ env.GCP_PROJECT_ID }}
+
+      - name: Restart deployment
+        run: |
+          kubectl rollout restart deployment/${{ env.DEPLOYMENT_NAME }} -n ${{ env.GKE_NAMESPACE }}
+          kubectl rollout status deployment/${{ env.DEPLOYMENT_NAME }} -n ${{ env.GKE_NAMESPACE }} --timeout=5m
+
+      - name: Verify deployment
+        run: |
+          kubectl get pods -n ${{ env.GKE_NAMESPACE }} -l app=${{ env.IMAGE_NAME }}
